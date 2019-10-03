@@ -1787,6 +1787,36 @@ Try to visit the target file for a richer summary line."
                 :textDocumentPositionParams
                 (eglot--TextDocumentPositionParams))))
 
+(defvar eglot--xref-definitions-method :textDocument/definition
+  "The LSP method to map xref-find-definitions call.")
+
+(defun eglot-find-declaration ()
+  "Find the declaration for the identifier at point.
+See `xref-find-definitions' and `xref-prompt-for-identifier'."
+  (interactive)
+  (eglot--find-location 'declaration))
+
+(defun eglot-find-implementation ()
+  "Find the implementation for the identifier at point.
+See `xref-find-definitions' and `xref-prompt-for-identifier'."
+  (interactive)
+  (eglot--find-location 'implementation))
+
+(defun eglot-find-typeDefinition ()
+  "Find the type definition for the identifier at point.
+See `xref-find-definitions' and `xref-prompt-for-identifier'."
+  (interactive)
+  (eglot--find-location 'typeDefinition))
+
+(defun eglot--find-location (kind)
+  (let* ((method-name (symbol-name kind))
+         (method (intern (concat ":textDocument/" method-name)))
+         (capability (intern (concat ":" method-name "Provider"))))
+    (if (eglot--server-capable capability)
+        (let ((eglot--xref-definitions-method method))
+          (call-interactively #'xref-find-definitions))
+      (eglot--error "Server is not a %sProvider" method-name))))
+
 (cl-defmethod xref-backend-definitions ((_backend (eql eglot)) identifier)
   (let* ((rich-identifier
           (car (member identifier eglot--xref-known-symbols)))
@@ -1794,7 +1824,7 @@ Try to visit the target file for a richer summary line."
           (if rich-identifier
               (get-text-property 0 :locations rich-identifier)
             (jsonrpc-request (eglot--current-server-or-lose)
-                             :textDocument/definition
+                             eglot--xref-definitions-method
                              (get-text-property
                               0 :textDocumentPositionParams identifier))))
          (locations
